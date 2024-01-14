@@ -13,6 +13,7 @@ This project is for Project Portfolio 3 at Full Sail University. It is a simple 
 1. Clone the repository to your local machine.
 2. Navigate to the root directory of the project.
 3. Run `npm install` to install all dependencies.
+    - After this step, you will need to create your `.env` file in the root directory of the `api` folder. Copy the contents of `.env.dist` into your `.env` file and fill in the values.
 4. Run `npm start` to start the development server.
 5. Navigate to `http://localhost:3000` in your browser.
 
