@@ -1,151 +1,103 @@
-const Spotify = require("../models/SpotifyToken");
-const querystring = require("querystring");
+const { REDIRECT_URI, CLIENT_ID, CLIENT_SECRET } = process.env;
+const SpotifyToken = require("../models/SpotifyToken");
+const axios = require("axios");
 
-const basicAuth =
-  "Basic " +
-  new Buffer.from(
-    process.env.CLIENT_ID + ":" + process.env.CLIENT_SECRET
-  ).toString("base64");
-
-const headers = {
-  "Content-Type": "application/x-www-form-urlencoded",
-  Authorization: basicAuth,
+const login = async (req, res) => {
+  const token = await SpotifyToken.findOne({ __v: 0 });
+  console.log("token:", token);
+  if (token) {
+    console.log("Token exists, redirecting...")
+    res.redirect("http://localhost:3000/");
+  } else {
+    res.redirect("http://localhost:3001/spotify/auth");
+  }
 };
 
 const auth = async (req, res) => {
+  console.log("Getting authorization code...");
   res.redirect(
-    "https://accounts.spotify.com/authorize?" +
-      querystring.stringify({
-        response_type: "code",
-        client_id: process.env.CLIENT_ID,
-        redirect_uri: process.env.REDIRECT_URI,
-      })
+    `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&show_dialog=true`
   );
 };
 
 const jwt = async (req, res, next) => {
-  req.token = await Spotify.findOne();
+  console.log("Getting JWT...");
+  req.token = await SpotifyToken.findOne({ __v: 0 });
   if (!req.token && !req.query.code) {
+    console.log("No token and no code");
     return next();
   }
   if (!req.token && req.query.code) {
-    const authOptions = {
-      method: "POST",
-      url: "https://accounts.spotify.com/api/token",
-      headers: headers,
-      body: `code=${req.query.code}&redirect_uri=${process.env.REDIRECT_URI}&grant_type=authorization_code`,
-      json: true,
-    };
-    fetch("https://accounts.spotify.com/api/token", authOptions)
-      .then((response) => {
-        if (response.status === 200) {
-          response.json().then((data) => {
-            const expires_in = new Date().getTime() + data.expires_in;
-            const spotify = new Spotify({
-              access_token: data.access_token,
-              refresh_token: data.refresh_token,
-              expires_in: expires_in,
-            });
-            spotify.save();
-            req.token = spotify;
-            next();
-          });
-        } else {
-          res.redirect(
-            "http://localhost:3000/" +
-              querystring.stringify({
-                error: "invalid_token",
-              })
-          );
-        }
-      })
-      .catch((err) => {
-        res.redirect("http://localhost:3000");
-        console.log(err);
-      });
-  } else if (new Date().getTime() > req.token.expires_in) {
-    const authOptions = {
-      method: "POST",
-      url: "https://accounts.spotify.com/api/token",
-      headers: headers,
-      body: `grant_type=refresh_token&refresh_token=${req.token.refresh_token}`,
-      json: true,
-    };
-    fetch("https://accounts.spotify.com/api/token", authOptions)
-      .then((response) => {
-        if (response.status === 200) {
-          response.json().then((data) => {
-            const expires_in = new Date().getTime() + data.expires_in;
-            const spotify = Spotify.findOne();
-            spotify.access_token = data.access_token;
-            spotify.refresh_token = data.refresh_token;
-            spotify.expires_in = expires_in;
+    console.log("No token but code");
+    req.token = await getToken(req.query.code, "authorization_code");
+    return next();
+  }
+  if (req.token && req.token.expires_in < new Date().getTime()) {
+    console.log("Token expired");
+    req.token = await getToken(req.token.refresh_token, "refresh_token");
+    return next();
+  }
+  return next();
+};
 
-            spotify.updateOne();
-            req.token = spotify;
-            next();
-          });
-        } else {
-          res.redirect(
-            "http://localhost:3000/" +
-              querystring.stringify({
-                error: "invalid_token",
-              })
-          );
-        }
-      })
-      .catch((err) => {
-        res.redirect("http://localhost:3000");
-        console.log(err);
-      });
+const getToken = async (code, grant_type) => {
+  console.log("Getting token with grant_type: ", grant_type, "...");
+  const authOptions = buildAuthOptions(code, grant_type);
+  const response = await axios(authOptions);
+  console.log("response:", response);
+  const { access_token, refresh_token, expires_in } = response.data;
+  if (grant_type === "authorization_code") {
+    const newToken = new SpotifyToken({
+      access_token: access_token,
+      refresh_token: refresh_token,
+      expires_in: new Date().getTime() + expires_in,
+    });
+    return newToken.save();
+  } else if (grant_type === "refresh_token") {
+    const token = await SpotifyToken.findOne({ __v: 0 });
+    token.access_token = access_token;
+    token.expires_in = new Date().getTime() + expires_in;
+    return token.save();
   } else {
-    next();
+    res.json({ error: "Failed getting JWT" });
   }
 };
 
 const callback = async (req, res) => {
-  if (!req.token) {
-    res.redirect("http://localhost:3000");
+  if (req.token) {
+    res.redirect("http://localhost:3000/");
   } else {
-    res.redirect(
-      "http://localhost:3000/" +
-        querystring.stringify({
-          access_token: req.token.access_token,
-          refresh_token: req.token.refresh_token,
-          expires_in: req.token.expires_in,
-        })
-    );
+    res.redirect("http://localhost:3001/spotify/auth");
   }
 };
 
-const search = async (req, res) => {
-  const searchOptions = {
-    method: "GET",
-    url: `https://api.spotify.com/v1/search?q=${req.query.q}&type=album,artist,playlist,track&limit=3`,
-    headers: {
-      Authorization: "Bearer " + req.token.access_token,
-    },
-    json: true,
+const buildAuthOptions = (code, grant_type) => {
+  const headers = {
+    Authorization:
+      "Basic " +
+      new Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64"),
   };
-  fetch(searchOptions.url, searchOptions)
-    .then((response) => {
-      if (response.status === 200) {
-        response.json().then((data) => {
-          res.json(data);
-        });
-      } else {
-        res.redirect(
-          "http://localhost:3000/" +
-            querystring.stringify({
-              error: "invalid_token",
-            })
-        );
-      }
-    })
-    .catch((err) => {
-      res.redirect("http://localhost:3000");
-      console.log(err);
-    });
+
+  if (grant_type === "refresh_token") {
+    const authOptions = {
+      method: "POST",
+      url: "https://accounts.spotify.com/api/token",
+      headers: headers,
+      body: `grant_type=${grant_type}&refresh_token=${code}`,
+      json: true,
+    };
+    return authOptions;
+  } else if (grant_type === "authorization_code") {
+    const authOptions = {
+      method: "POST",
+      url: `https://accounts.spotify.com/api/token?code=${code}&redirect_uri=${REDIRECT_URI}&grant_type=${grant_type}`,
+      headers: headers,
+      json: true,
+    };
+    return authOptions;
+  } else {
+    res.json({ error: "Invalid grant_type" });
+  }
 };
 
-module.exports = { auth, callback, jwt, search };
+module.exports = { login, auth, jwt, callback };
