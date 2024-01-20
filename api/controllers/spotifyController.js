@@ -1,9 +1,10 @@
 const { REDIRECT_URI, CLIENT_ID, CLIENT_SECRET } = process.env;
 const SpotifyToken = require("../models/SpotifyToken");
 const axios = require("axios");
-const now = new Date().getTime();
+
 
 const login = async (req, res) => {
+  const now = new Date().getTime() / 1000 | 0  ;
   console.log("LOGIN STEP: Time now:", now);
   const token = await SpotifyToken.findOne({ __v: 0 });
   console.log("LOGIN STEP: token:", token);
@@ -27,6 +28,7 @@ const auth = async (req, res) => {
 };
 
 const jwt = async (req, res, next) => {
+  const now = new Date().getTime() / 1000 | 0  ;
   console.log("Getting JWT...");
   req.token = await SpotifyToken.findOne({ __v: 0 });
   if (!req.token && !req.query.code) {
@@ -36,7 +38,7 @@ const jwt = async (req, res, next) => {
     console.log("No token but code");
     req.token = await getToken(req.query.code, "authorization_code");
     return next();
-  } else if (req.token && req.token.expires_in < new Date().getTime()) {
+  } else if (req.token && req.token.expires_in < now) {
     console.log("Token expired");
     req.token = await getToken(req.token.refresh_token, "refresh_token");
     return next();
@@ -53,14 +55,15 @@ const getToken = async (code, grant_type) => {
   console.log("response:", response.data);
   const { access_token, refresh_token, expires_in } = response.data;
   if (grant_type === "authorization_code") {
+    const now = new Date().getTime() / 1000 | 0;
     const newToken = new SpotifyToken({
       access_token: access_token,
       refresh_token: refresh_token,
-      expires_in: new Date().getTime() + expires_in,
+      expires_in: now + expires_in,
     });
     return newToken.save();
   } else if (grant_type === "refresh_token") {
-    const now = new Date().getTime();
+    const now = new Date().getTime() / 1000 | 0;
     const updateToken = await SpotifyToken.findOne({ __v: 0 });
     updateToken.access_token = access_token;
     updateToken.expires_in = now + expires_in;
@@ -108,7 +111,8 @@ const buildAuthOptions = (code, grant_type) => {
 };
 
 const status = (req, res) => {
-  if (req.token && req.token.expires_in > new Date().getTime()) {
+  const now = new Date().getTime() / 1000 | 0;
+  if (req.token && req.token.expires_in > now) {
     res.json({ status: "connected" });
   } else {
     res.json({ status: "disconnected" });
