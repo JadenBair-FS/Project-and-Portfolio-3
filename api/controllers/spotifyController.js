@@ -1,14 +1,20 @@
 const { REDIRECT_URI, CLIENT_ID, CLIENT_SECRET } = process.env;
 const SpotifyToken = require("../models/SpotifyToken");
 const axios = require("axios");
+const now = new Date().getTime();
 
 const login = async (req, res) => {
+  console.log("LOGIN STEP: Time now:", now);
   const token = await SpotifyToken.findOne({ __v: 0 });
-  console.log("token:", token);
-  if (token) {
-    console.log("Token exists, redirecting...")
+  console.log("LOGIN STEP: token:", token);
+  if (token && now > token.expires_in) {
+    console.log("LOGIN STEP: Token expired, getting new token...");
+    res.redirect("http://localhost:3001/spotify/auth");
+  } else if (token && now < token.expires_in) {
+    console.log("Token exists, redirecting...");
     res.redirect("http://localhost:3000/");
   } else {
+    console.log("No token, redirecting...");
     res.redirect("http://localhost:3001/spotify/auth");
   }
 };
@@ -16,7 +22,7 @@ const login = async (req, res) => {
 const auth = async (req, res) => {
   console.log("Getting authorization code...");
   res.redirect(
-    `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&show_dialog=true`
+    `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}`
   );
 };
 
@@ -26,25 +32,25 @@ const jwt = async (req, res, next) => {
   if (!req.token && !req.query.code) {
     console.log("No token and no code");
     return next();
-  }
-  if (!req.token && req.query.code) {
+  } else if (!req.token && req.query.code) {
     console.log("No token but code");
     req.token = await getToken(req.query.code, "authorization_code");
     return next();
-  }
-  if (req.token && req.token.expires_in < new Date().getTime()) {
+  } else if (req.token && req.token.expires_in < new Date().getTime()) {
     console.log("Token expired");
     req.token = await getToken(req.token.refresh_token, "refresh_token");
     return next();
+  } else {
+    console.log("Token exists and not expired");
+    return next();
   }
-  return next();
 };
 
 const getToken = async (code, grant_type) => {
   console.log("Getting token with grant_type: ", grant_type, "...");
   const authOptions = buildAuthOptions(code, grant_type);
   const response = await axios(authOptions);
-  console.log("response:", response);
+  console.log("response:", response.data);
   const { access_token, refresh_token, expires_in } = response.data;
   if (grant_type === "authorization_code") {
     const newToken = new SpotifyToken({
@@ -54,10 +60,12 @@ const getToken = async (code, grant_type) => {
     });
     return newToken.save();
   } else if (grant_type === "refresh_token") {
-    const token = await SpotifyToken.findOne({ __v: 0 });
-    token.access_token = access_token;
-    token.expires_in = new Date().getTime() + expires_in;
-    return token.save();
+    const now = new Date().getTime();
+    const updateToken = await SpotifyToken.findOne({ __v: 0 });
+    updateToken.access_token = access_token;
+    updateToken.expires_in = now + expires_in;
+    console.log(`New token should not expire until ${updateToken.expires_in}`);
+    return updateToken.save();
   } else {
     res.json({ error: "Failed getting JWT" });
   }
@@ -81,9 +89,8 @@ const buildAuthOptions = (code, grant_type) => {
   if (grant_type === "refresh_token") {
     const authOptions = {
       method: "POST",
-      url: "https://accounts.spotify.com/api/token",
+      url: `https://accounts.spotify.com/api/token?grant_type=${grant_type}&refresh_token=${code}`,
       headers: headers,
-      body: `grant_type=${grant_type}&refresh_token=${code}`,
       json: true,
     };
     return authOptions;
@@ -100,4 +107,12 @@ const buildAuthOptions = (code, grant_type) => {
   }
 };
 
-module.exports = { login, auth, jwt, callback };
+const status = (req, res) => {
+  if (req.token && req.token.expires_in > new Date().getTime()) {
+    res.json({ status: "connected" });
+  } else {
+    res.json({ status: "disconnected" });
+  }
+};
+
+module.exports = { login, auth, jwt, callback, status };
