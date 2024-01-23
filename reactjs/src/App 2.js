@@ -11,11 +11,11 @@ function App() {
         </p>
         <a
           className="App-link"
-          href="http://localhost:3001/spotify/login"
+          href="https://reactjs.org"
           target="_blank"
           rel="noopener noreferrer"
         >
-         Connect to Spotify
+          Learn React
         </a>
       </header>
     </div>
