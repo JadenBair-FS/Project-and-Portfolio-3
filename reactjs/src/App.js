@@ -1,23 +1,32 @@
-import logo from './logo.svg';
-import './App.css';
+import LoginPage from "./pages/Login.js";
+import SearchPage from "./pages/Search.js";
+import { useEffect, useState } from "react";
 
 function App() {
+  
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    getStatus();
+  }
+  , []);
+
+
+
+  const getStatus = async () => {
+    const response = await fetch("http://localhost:3001/spotify/status");
+    const data = await response.json();
+    console.log(data.status);
+    if (data.status === "connected") {
+      setConnected(true);
+    } else {
+      setConnected(false);
+    }
+  };
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="http://localhost:3001/spotify/login"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-         Connect to Spotify
-        </a>
-      </header>
+      {connected ? <SearchPage /> : <LoginPage />}
     </div>
   );
 }
