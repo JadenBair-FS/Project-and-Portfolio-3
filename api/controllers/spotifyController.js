@@ -1,10 +1,10 @@
 const { REDIRECT_URI, CLIENT_ID, CLIENT_SECRET } = process.env;
+const { query } = require("express");
 const SpotifyToken = require("../models/SpotifyToken");
 const axios = require("axios");
 
-
 const login = async (req, res) => {
-  const now = new Date().getTime() / 1000 | 0  ;
+  const now = (new Date().getTime() / 1000) | 0;
   console.log("LOGIN STEP: Time now:", now);
   const token = await SpotifyToken.findOne({ __v: 0 });
   console.log("LOGIN STEP: token:", token);
@@ -28,7 +28,7 @@ const auth = async (req, res) => {
 };
 
 const jwt = async (req, res, next) => {
-  const now = new Date().getTime() / 1000 | 0  ;
+  const now = (new Date().getTime() / 1000) | 0;
   console.log("Getting JWT...");
   req.token = await SpotifyToken.findOne({ __v: 0 });
   if (!req.token && !req.query.code) {
@@ -55,7 +55,7 @@ const getToken = async (code, grant_type) => {
   console.log("response:", response.data);
   const { access_token, refresh_token, expires_in } = response.data;
   if (grant_type === "authorization_code") {
-    const now = new Date().getTime() / 1000 | 0;
+    const now = (new Date().getTime() / 1000) | 0;
     const newToken = new SpotifyToken({
       access_token: access_token,
       refresh_token: refresh_token,
@@ -63,11 +63,11 @@ const getToken = async (code, grant_type) => {
     });
     return newToken.save();
   } else if (grant_type === "refresh_token") {
-    const now = new Date().getTime() / 1000 | 0;
+    const now = (new Date().getTime() / 1000) | 0;
     const updateToken = await SpotifyToken.findOne({ __v: 0 });
     updateToken.access_token = access_token;
     updateToken.expires_in = now + expires_in;
-    console.log(`New token should not expire until ${updateToken.expires_in}`);
+    console.log(`New token will not expire until ${updateToken.expires_in}`);
     return updateToken.save();
   } else {
     res.json({ error: "Failed getting JWT" });
@@ -110,8 +110,9 @@ const buildAuthOptions = (code, grant_type) => {
   }
 };
 
-const status = (req, res) => {
-  const now = new Date().getTime() / 1000 | 0;
+const status = async (req, res) => {
+  req.token = await SpotifyToken.findOne({ __v: 0 });
+  const now = (new Date().getTime() / 1000) | 0;
   if (req.token && req.token.expires_in > now) {
     res.json({ status: "connected" });
   } else {
@@ -119,4 +120,27 @@ const status = (req, res) => {
   }
 };
 
-module.exports = { login, auth, jwt, callback, status };
+const search = async (req, res) => {
+  const { q } = req.query;
+  console.log("Query:", q);
+  const { access_token } = req.token;
+  const headers = {
+    Authorization: `Bearer ${access_token}`,
+    "Content-Type": "application/json",
+  };
+  const searchOptions = {
+    method: "GET",
+    url: `https://api.spotify.com/v1/search?q=${q}&type=track,artist,album&limit=3`,
+    headers: headers,
+    json: true,
+  };
+  await axios(searchOptions)
+    .then((response) => {
+      res.json(response.data);
+    })
+    .catch((error) => {
+      res.json({ error: "Failed searching" });
+    });
+};
+
+module.exports = { login, auth, jwt, callback, status, search };
