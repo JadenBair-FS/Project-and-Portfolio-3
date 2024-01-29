@@ -14,10 +14,10 @@ This project is for Project Portfolio 3 at Full Sail University. It is a simple 
 1. Clone the repository to your local machine.
 2. Navigate to the root directory of the project.
 3. Run `npm install` to install all dependencies.
-    - After this step, you will need to create your `.env` file in the root directory of the `api` folder. Copy the contents of `.env.dist` into your `.env` file and fill in the values.
+   - After this step, you will need to create your `.env` file in the root directory of the `api` folder. Copy the contents of `.env.dist` into your `.env` file and fill in the values.
 4. In terminal, navigate to the `api` folder and run `npm run watch`.
 5. In a new terminal, navigate to the `reactjs` folder and run `npm run start`.
-5. Navigate to `http://localhost:3000` in your browser.
+6. Navigate to `http://localhost:3000` in your browser.
 
 # Set Up Mongo Database
 
@@ -34,8 +34,10 @@ This project is for Project Portfolio 3 at Full Sail University. It is a simple 
 11. Click on Drivers.
 12. Copy the connection string to your `.env` file in the `api` folder. Make sure to replace `<password>` with the password you created in step 7.
 
-
 # Links
 
 - http://localhost:3000 - ReactJS application frontend, primary interface for the application
+- http://localhost:3000/login - ReactJS application frontend to login to Spotify
+- http://localhost:3000/search - ReactJS application frontend to search for artists, albums, and tracks
 - http://localhost:3001/spotify - NodeJS application backend, handles API requests to Spotify Web API
+- http://localhost:3001/spotify/status - Checks the token status for the Spotify Web API, returns "disconnected" if the token is invalid, otherwise returns "connected".
