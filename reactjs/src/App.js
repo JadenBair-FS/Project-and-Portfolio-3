@@ -37,6 +37,7 @@ export default App;
 const styles = {
   main: {
     backgroundColor: "black",
+    height: "100%",
   },
 
 }

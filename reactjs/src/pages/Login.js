@@ -4,7 +4,7 @@ import SpotifyIconGreen from "../images/SpotifyIconGreen.png";
 
 const Login = () => {
   return (
-    <section className="Login">
+    <section>
       <Header />
       <article style={styles.main}>
         <div style={styles.content}>
