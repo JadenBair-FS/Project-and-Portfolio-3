@@ -1,4 +1,10 @@
+
+
+
 const Button = (props) => {
+
+
+
   return <button style={styles.button}>{props.children}</button>;
 };
 
@@ -6,13 +12,14 @@ export default Button;
 
 const styles = {
   button: {
-    backgroundColor: "green",
+    backgroundColor: "#1DB954",
     color: "white",
-    padding: "10px",
+    width: "75%",
+    padding: "15px",
     border: "none",
-    borderRadius: "5px",
+    borderRadius: "100px",
     cursor: "pointer",
-    fontSize: "1em",
+    fontSize: "2em",
     fontWeight: "bold",
   },
 };
