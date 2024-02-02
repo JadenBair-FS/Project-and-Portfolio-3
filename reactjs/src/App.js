@@ -25,10 +25,20 @@ function App() {
   };
 
   return (
-    <div className="App">
+    <div style={styles.main}>
       {connected ? <SearchPage /> : <LoginPage />}
     </div>
   );
 }
 
 export default App;
+
+
+const styles = {
+  main: {
+    backgroundColor: "black",
+  },
+
+}
+
+
